@@ -93,7 +93,7 @@ final class DamageNumberRenderer {
         prepared.visit(new Font.GlyphVisitor() {
             @Override
             public void acceptRenderable(TextRenderable renderable) {
-                collector.submitCustomGeometry(matrices, renderable.renderType(Font.DisplayMode.SEE_THROUGH),
+                collector.submitCustomGeometry(matrices, renderable.renderType(Font.DisplayMode.NORMAL),
                         (pose, consumer) -> renderable.render(pose.pose(), GradientMultiBufferSource.wrap(
                                 consumer, paint, angle, left, top, right, bottom, alpha), FULL_BRIGHT, false));
             }
@@ -107,7 +107,7 @@ final class DamageNumberRenderer {
             return;
         }
         collector.submitText(matrices, x, y, component.getVisualOrderText(), false,
-                Font.DisplayMode.SEE_THROUGH, FULL_BRIGHT, fadedColor, 0, 0);
+                Font.DisplayMode.NORMAL, FULL_BRIGHT, fadedColor, 0, 0);
     }
 
     private static int multiplyAlpha(int argb, float alpha) {

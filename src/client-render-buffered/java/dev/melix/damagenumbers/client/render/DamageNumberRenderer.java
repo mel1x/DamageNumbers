@@ -182,7 +182,7 @@ final class DamageNumberRenderer {
             // Alpha values below 4 are treated as opaque RGB.
             if ((color >>> 24) >= 4) {
                 font.drawInBatch(glyph.component(), x, y, color, false, matrices.last().pose(), consumers,
-                        Font.DisplayMode.SEE_THROUGH, 0, FULL_BRIGHT);
+                        Font.DisplayMode.NORMAL, 0, FULL_BRIGHT);
             }
             x += glyph.width();
             covered += glyph.width();
