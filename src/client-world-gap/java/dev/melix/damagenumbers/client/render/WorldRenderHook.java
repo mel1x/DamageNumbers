@@ -3,7 +3,6 @@ package dev.melix.damagenumbers.client.render;
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.Minecraft;
 
-/** World render bridge for Minecraft 1.21.9, whose Fabric API has no world events. */
 public final class WorldRenderHook {
     private static DamageNumberManager manager;
 

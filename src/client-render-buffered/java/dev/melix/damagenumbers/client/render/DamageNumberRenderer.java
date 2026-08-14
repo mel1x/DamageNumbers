@@ -179,7 +179,7 @@ final class DamageNumberRenderer {
             float center = covered + glyph.width() * 0.5F;
             float gradientProgress = totalWidth <= 0.0F ? 0.0F : center / totalWidth;
             int color = multiplyAlpha(paint.colorAt(gradientProgress), alpha);
-            // Alpha values below 4 are treated as opaque RGB.
+            // Alpha 0-3 means opaque RGB.
             if ((color >>> 24) >= 4) {
                 font.drawInBatch(glyph.component(), x, y, color, false, matrices.last().pose(), consumers,
                         Font.DisplayMode.NORMAL, 0, FULL_BRIGHT);

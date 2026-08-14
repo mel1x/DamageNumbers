@@ -9,7 +9,6 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-/** Captures the exact client attack that is sent to the server. */
 @Mixin(MultiPlayerGameMode.class)
 abstract class MultiPlayerGameModeMixin {
     @Inject(method = "attack", at = @At("HEAD"), require = 1)

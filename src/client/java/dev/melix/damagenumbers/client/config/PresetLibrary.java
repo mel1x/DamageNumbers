@@ -26,7 +26,7 @@ public final class PresetLibrary {
                             ColorPaint.gradient(0xFFF4F7FF, 0xFF9FB1CA), ColorPaint.solid(0xFF252A32),
                             0.45F, 90.0F, 0.18F, 0.27F)),
             new BuiltInPreset("builtin:rift", "damage_numbers.preset.rift",
-                    new Snapshot(0.046F, true, 1_300, SplashAnimation.POP, FontChoice.ZENLESS_ZONE_ZERO, null,
+                    new Snapshot(0.046F, true, 1_300, SplashAnimation.POP, FontChoice.STREET, null,
                             ColorPaint.gradient(0xFFFF6A8A, 0xFF65D6C2), ColorPaint.solid(0xFF160E18),
                             1.25F, 90.0F, 0.25F, 0.38F))
     );

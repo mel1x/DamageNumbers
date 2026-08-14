@@ -50,7 +50,7 @@ public final class DamageNumberManager {
                 : livingEntity.position().add(0.0D, livingEntity.getBbHeight() * 0.65D, 0.0D);
         Vec3 towardPlayer = player.getEyePosition().subtract(hitPosition);
         if (towardPlayer.lengthSqr() > 1.0E-6D) {
-            // Prevent surface z-fighting.
+            // Avoid z-fighting.
             hitPosition = hitPosition.add(towardPlayer.normalize().scale(0.035D));
         }
         watch(livingEntity, hitPosition, isLikelyCritical(player));
@@ -127,7 +127,7 @@ public final class DamageNumberManager {
                     spawn(damage, position, style, hit.critical);
                 }
             } else if (currentHealth > watch.lastEffectiveHealth) {
-                // Use regenerated health as the new baseline.
+                // Reset after healing.
                 watch.lastEffectiveHealth = currentHealth;
             }
         }

@@ -7,7 +7,6 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-/** Provides the missing world render hook for Minecraft 1.21.9. */
 @Mixin(LevelRenderer.class)
 abstract class LevelRendererMixin {
     @Inject(method = "renderLevel", at = @At("TAIL"), require = 0)

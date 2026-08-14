@@ -1099,19 +1099,15 @@ public final class DamageNumbersConfigScreen extends DamageNumbersScreenBase {
         return Component.translatable("damage_numbers.animation." + animation.name().toLowerCase(Locale.ROOT));
     }
 
-    private static String hex(int argb) {
-        return String.format(Locale.ROOT, "#%06X", argb & 0x00FFFFFF);
-    }
-
     private static String rangeLabel(float minimum, float nextMinimum) {
         String start = formatRangeValue(minimum);
         if (!Float.isFinite(nextMinimum)) {
-            return start + "–∞";
+            return start + "-∞";
         }
         if (isWhole(minimum) && isWhole(nextMinimum) && nextMinimum - minimum >= 1.0F) {
-            return start + "–" + formatRangeValue(nextMinimum - 1.0F);
+            return start + "-" + formatRangeValue(nextMinimum - 1.0F);
         }
-        return start + "–<" + formatRangeValue(nextMinimum);
+        return start + "-<" + formatRangeValue(nextMinimum);
     }
 
     private static String formatRangeValue(float value) {

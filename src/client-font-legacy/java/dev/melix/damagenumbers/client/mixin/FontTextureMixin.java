@@ -9,7 +9,6 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-/** Enables bilinear sampling for monochrome glyph atlases, including TTF and the default font. */
 @Mixin(FontTexture.class)
 abstract class FontTextureMixin {
     @Shadow @Final private boolean colored;

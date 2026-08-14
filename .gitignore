@@ -8,4 +8,5 @@ classes/
 *.ipr
 *.iws
 versions/*/build/
+versions/*/bin/
 versions/*/run/

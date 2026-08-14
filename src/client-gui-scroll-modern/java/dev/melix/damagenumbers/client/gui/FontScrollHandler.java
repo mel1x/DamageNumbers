@@ -6,7 +6,6 @@ import net.minecraft.client.gui.narration.NarrationElementOutput;
 
 import java.util.function.DoubleConsumer;
 
-/** Mouse wheel, horizontal gesture and draggable track input for the font gallery. */
 final class FontScrollHandler implements GuiEventListener, NarratableEntry {
     private final int x;
     private final int y;

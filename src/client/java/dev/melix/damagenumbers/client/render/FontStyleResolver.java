@@ -8,15 +8,10 @@ import net.minecraft.network.chat.Style;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 
-/** Bridges font ID APIs across Minecraft versions. */
 public final class FontStyleResolver {
     private static final FontFactory FACTORY = createFactory();
 
     private FontStyleResolver() {
-    }
-
-    public static Component component(String text, FontChoice font) {
-        return component(text, font, null);
     }
 
     public static Component component(String text, FontChoice font, String customFontId) {
@@ -41,7 +36,7 @@ public final class FontStyleResolver {
             Method withFont = Style.class.getMethod("withFont", resourceLocation);
             return (style, id) -> (Style) withFont.invoke(style, parse.invoke(null, id));
         } catch (ClassNotFoundException ignored) {
-            // New versions use Identifier and FontDescription.
+            // Try the new API below.
         } catch (ReflectiveOperationException exception) {
             throw new IllegalStateException("Cannot initialize legacy font support", exception);
         }

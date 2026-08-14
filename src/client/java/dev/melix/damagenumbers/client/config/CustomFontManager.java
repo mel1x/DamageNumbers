@@ -29,7 +29,6 @@ import java.util.Locale;
 import java.util.UUID;
 import java.util.function.Consumer;
 
-/** Imports user TTF/OTF files through a small automatically enabled resource pack. */
 public final class CustomFontManager {
     private static final Logger LOGGER = LoggerFactory.getLogger("damage-numbers/fonts");
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();

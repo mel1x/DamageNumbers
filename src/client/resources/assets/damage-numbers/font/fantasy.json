@@ -2,7 +2,7 @@
   "providers": [
     {
       "type": "ttf",
-      "file": "damage-numbers:zenless_zone_zero.ttf",
+      "file": "damage-numbers:fantasy.ttf",
       "shift": [0.0, 1.0],
       "size": 11.0,
       "oversample": 16.0

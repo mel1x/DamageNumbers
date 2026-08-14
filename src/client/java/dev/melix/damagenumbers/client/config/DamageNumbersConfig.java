@@ -22,7 +22,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 
-/** Runtime configuration and persistent user presets for DamageNumbers. */
 public final class DamageNumbersConfig {
     private static final Logger LOGGER = LoggerFactory.getLogger("damage-numbers/config");
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
@@ -311,12 +310,6 @@ public final class DamageNumbersConfig {
         selectedPresetId = null;
     }
 
-    public synchronized void setBorder(ColorPaint border) {
-        this.border = Objects.requireNonNull(border, "border");
-        updateActiveDamageRange();
-        selectedPresetId = null;
-    }
-
     public synchronized void setUnderlayColor(int argb) {
         this.border = ColorPaint.solid(argb);
         updateActiveDamageRange();
@@ -332,7 +325,7 @@ public final class DamageNumbersConfig {
         selectedPresetId = null;
     }
 
-    /** 0 degrees points left-to-right; 90 degrees points top-to-bottom. */
+    // 0 = horizontal, 90 = vertical.
     public synchronized void setGradientAngleDegrees(float gradientAngleDegrees) {
         if (!Float.isFinite(gradientAngleDegrees)) {
             throw new IllegalArgumentException("gradientAngleDegrees must be finite");
@@ -509,7 +502,7 @@ public final class DamageNumbersConfig {
                 booleanValue(object, "scaleWithDamage", fallback.scaleWithDamage()),
                 nonNegativeLong(object, "fadeOutTimeMillis", fallback.fadeOutTimeMillis()),
                 enumValue(object, "splashAnimation", SplashAnimation.class, fallback.splashAnimation()),
-                enumValue(object, "font", FontChoice.class, fallback.font()),
+                fontValue(object, fallback.font()),
                 nullableStringValue(object, "customFontId", fallback.customFontId()),
                 readPaint(object.get("fill"), fallback.fill()),
                 readPaint(object.get("border"), fallback.border()),
@@ -603,10 +596,6 @@ public final class DamageNumbersConfig {
         }
     }
 
-    private static int boundedInt(JsonObject object, String key, int fallback, int min, int max) {
-        return Math.max(min, Math.min(max, intValue(object, key, fallback)));
-    }
-
     private static float boundedFloat(JsonObject object, String key, float fallback, float min, float max) {
         return Math.max(min, Math.min(max, floatValue(object, key, fallback)));
     }
@@ -633,6 +622,21 @@ public final class DamageNumbersConfig {
         }
     }
 
+    private static FontChoice fontValue(JsonObject object, FontChoice fallback) {
+        String value = stringValue(object, "font", fallback.name());
+        return switch (value) {
+            case "GENSHIN_IMPACT" -> FontChoice.FANTASY;
+            case "ZENLESS_ZONE_ZERO" -> FontChoice.STREET;
+            default -> {
+                try {
+                    yield FontChoice.valueOf(value);
+                } catch (IllegalArgumentException ignored) {
+                    yield fallback;
+                }
+            }
+        };
+    }
+
     private static float normalizeAngle(float angle) {
         return ((angle % 360.0F) + 360.0F) % 360.0F;
     }
@@ -649,8 +653,8 @@ public final class DamageNumbersConfig {
         GEIST("damage-numbers:geist"),
         SANS_SERIF("damage-numbers:sans_serif"),
         POPPINS("damage-numbers:poppins"),
-        GENSHIN_IMPACT("damage-numbers:genshin_impact"),
-        ZENLESS_ZONE_ZERO("damage-numbers:zenless_zone_zero"),
+        FANTASY("damage-numbers:fantasy"),
+        STREET("damage-numbers:street"),
         CUSTOM(null);
 
         private final String resourceId;

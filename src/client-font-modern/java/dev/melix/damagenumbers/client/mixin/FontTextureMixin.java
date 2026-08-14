@@ -14,7 +14,6 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import java.util.function.Supplier;
 
-/** Enables bilinear sampling after the rendering backend moved filtering into immutable samplers. */
 @Mixin(FontTexture.class)
 abstract class FontTextureMixin extends AbstractTexture {
     @Shadow @Final private boolean colored;

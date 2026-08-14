@@ -7,7 +7,6 @@ import net.minecraft.client.input.MouseButtonEvent;
 
 import java.util.function.DoubleConsumer;
 
-/** Handles wheel and drag input for vertical scrolling. */
 final class PresetScrollHandler implements GuiEventListener, NarratableEntry {
     private final int x;
     private final int y;

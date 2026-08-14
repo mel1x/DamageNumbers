@@ -9,7 +9,6 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 
-/** Applies a gradient by replacing each text vertex color. */
 final class GradientMultiBufferSource {
     private GradientMultiBufferSource() {
     }
@@ -25,7 +24,7 @@ final class GradientMultiBufferSource {
             float alpha
     ) {
         return renderType -> {
-            // Font atlas changes can replace the active buffer.
+            // Atlas reloads can swap the buffer.
             VertexConsumer original = delegate.getBuffer(renderType);
             return createProxy(original, paint, angleDegrees, left, top, right, bottom, alpha);
         };
