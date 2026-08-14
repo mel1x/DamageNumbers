@@ -10,14 +10,6 @@ record DamageNumber(
         DamageNumbersConfig.Snapshot style,
         float scaleMultiplier
 ) {
-    float progress(long nowNanos) {
-        long lifetimeNanos = lifetimeNanos();
-        if (lifetimeNanos == 0L) {
-            return 1.0F;
-        }
-        return Math.min(1.0F, Math.max(0.0F, (float) (nowNanos - createdAtNanos) / lifetimeNanos));
-    }
-
     boolean isExpired(long nowNanos) {
         return nowNanos - createdAtNanos >= lifetimeNanos();
     }

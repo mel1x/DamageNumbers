@@ -8,10 +8,12 @@ import dev.melix.damagenumbers.client.config.DamageNumbersConfig.DamageRange;
 import dev.melix.damagenumbers.client.config.DamageNumbersConfig.FontChoice;
 import dev.melix.damagenumbers.client.config.DamageNumbersConfig.SavedPreset;
 import dev.melix.damagenumbers.client.config.DamageNumbersConfig.Snapshot;
-import dev.melix.damagenumbers.client.config.DamageNumbersConfig.SplashAnimation;
+import dev.melix.damagenumbers.client.config.DamageNumbersConfig.AppearanceAnimation;
+import dev.melix.damagenumbers.client.config.DamageNumbersConfig.AppearanceAnimationScope;
 import dev.melix.damagenumbers.client.config.CustomFontManager;
 import dev.melix.damagenumbers.client.config.CustomFontManager.CustomFont;
 import dev.melix.damagenumbers.client.config.PresetLibrary;
+import dev.melix.damagenumbers.client.render.AppearanceAnimator;
 import dev.melix.damagenumbers.client.render.FontStyleResolver;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
@@ -34,6 +36,7 @@ public final class DamageNumbersConfigScreen extends DamageNumbersScreenBase {
     private static final int TEXT = 0xFFF4F6F8;
     private static final int MUTED = 0xFFA6ADB8;
     private static final int RANGE_TOP = 43;
+    private static final int BLUR_DIRECTIONS = 8;
     private static final int PAGE_CONTENT_TOP = 74;
     private static final int CUSTOMIZATION_OFFSET = 40;
     private static final int[] COLOR_PALETTE = {
@@ -213,7 +216,7 @@ public final class DamageNumbersConfigScreen extends DamageNumbersScreenBase {
         int viewportTop = PAGE_CONTENT_TOP;
         int viewportBottom = height - 12;
         int formWidth = width - 12;
-        int contentBottom = (advancedSettingsExpanded ? 431 : 365) + CUSTOMIZATION_OFFSET;
+        int contentBottom = (advancedSettingsExpanded ? 475 : 409) + CUSTOMIZATION_OFFSET;
         customizationMaxScroll = Math.max(0, contentBottom - viewportBottom);
         customizationScroll = Math.max(0.0D, Math.min(customizationMaxScroll, customizationScroll));
         int fontGap = 4;
@@ -264,19 +267,24 @@ public final class DamageNumbersConfigScreen extends DamageNumbersScreenBase {
                 viewportTop, viewportBottom);
         addDecimalInput(x + formWidth - 88, customizationY(167), 86, 18, Float.toString(style.scale()),
                 this::applyScaleInput, viewportTop, viewportBottom);
-        addScrollingAction(x, customizationY(189), formWidth, () -> mutate(this::cycleAnimation), viewportTop,
+        addScrollingAction(x, customizationY(189), formWidth, () -> mutate(this::cycleAnimationScope), viewportTop,
                 viewportBottom);
-        addScrollingAction(x, customizationY(211), formWidth, () -> mutate(this::toggleFillMode), viewportTop,
+        addScrollingAction(x, customizationY(211), formWidth, () -> mutate(this::cycleAnimation), viewportTop,
                 viewportBottom);
-        addColorControl(x, customizationY(233), formWidth, ColorPickerScreen.Target.FILL_FIRST, true,
+        addIntegerInput(x + formWidth - 88, customizationY(233), 86, 18,
+                Long.toString(style.appearanceAnimationMillis()), this::applyAnimationDurationInput,
                 viewportTop, viewportBottom);
-        addColorControl(x, customizationY(255), formWidth, ColorPickerScreen.Target.FILL_SECOND,
+        addScrollingAction(x, customizationY(255), formWidth, () -> mutate(this::toggleFillMode), viewportTop,
+                viewportBottom);
+        addColorControl(x, customizationY(277), formWidth, ColorPickerScreen.Target.FILL_FIRST, true,
+                viewportTop, viewportBottom);
+        addColorControl(x, customizationY(299), formWidth, ColorPickerScreen.Target.FILL_SECOND,
                 style.fill().mode() == ColorMode.GRADIENT, viewportTop, viewportBottom);
-        addColorControl(x, customizationY(277), formWidth, ColorPickerScreen.Target.UNDERLAY, true,
+        addColorControl(x, customizationY(321), formWidth, ColorPickerScreen.Target.UNDERLAY, true,
                 viewportTop, viewportBottom);
-        addDecimalInput(x + formWidth - 88, customizationY(299), 86, 18, Float.toString(style.borderWidth()),
+        addDecimalInput(x + formWidth - 88, customizationY(343), 86, 18, Float.toString(style.borderWidth()),
                 this::applyBorderInput, viewportTop, viewportBottom);
-        int sliderY = customizationY(321);
+        int sliderY = customizationY(365);
         if (fullyVisible(sliderY, 18, viewportTop, viewportBottom)) {
             addRenderableWidget(new FlatAngleSlider(x + formWidth - 126, sliderY + 1, 94, 16,
                     style.gradientAngleDegrees(), angle -> {
@@ -284,17 +292,17 @@ public final class DamageNumbersConfigScreen extends DamageNumbersScreenBase {
                         config.save();
             }));
         }
-        addAdvancedToggle(x, customizationY(343), formWidth, () -> {
+        addAdvancedToggle(x, customizationY(387), formWidth, () -> {
             advancedSettingsExpanded = !advancedSettingsExpanded;
             rebuildPageWidgets();
         }, viewportTop, viewportBottom);
         if (advancedSettingsExpanded) {
-            addIntegerInput(x + formWidth - 88, customizationY(365), 86, 18,
+            addIntegerInput(x + formWidth - 88, customizationY(409), 86, 18,
                     Long.toString(style.fadeOutTimeMillis()), this::applyFadeInput, viewportTop, viewportBottom);
-            addDecimalInput(x + formWidth - 88, customizationY(387), 86, 18,
+            addDecimalInput(x + formWidth - 88, customizationY(431), 86, 18,
                     Float.toString(style.minimumSpawnRadius()), this::applyMinimumRadiusInput,
                     viewportTop, viewportBottom);
-            addDecimalInput(x + formWidth - 88, customizationY(409), 86, 18,
+            addDecimalInput(x + formWidth - 88, customizationY(453), 86, 18,
                     Float.toString(style.maximumSpawnRadius()), this::applyMaximumRadiusInput,
                     viewportTop, viewportBottom);
         }
@@ -407,6 +415,14 @@ public final class DamageNumbersConfigScreen extends DamageNumbersScreenBase {
     private void applyFadeInput(String text) {
         try {
             config.setFadeOutTimeMillis(Long.parseLong(text));
+            config.save();
+        } catch (NumberFormatException ignored) {
+        }
+    }
+
+    private void applyAnimationDurationInput(String text) {
+        try {
+            config.setAppearanceAnimationMillis(Long.parseLong(text));
             config.save();
         } catch (NumberFormatException ignored) {
         }
@@ -571,9 +587,15 @@ public final class DamageNumbersConfigScreen extends DamageNumbersScreenBase {
     }
 
     private void cycleAnimation() {
-        SplashAnimation[] values = SplashAnimation.values();
-        SplashAnimation current = config.snapshot().splashAnimation();
-        config.setSplashAnimation(values[(current.ordinal() + 1) % values.length]);
+        AppearanceAnimation[] values = AppearanceAnimation.values();
+        AppearanceAnimation current = config.snapshot().appearanceAnimation();
+        config.setAppearanceAnimation(values[(current.ordinal() + 1) % values.length]);
+    }
+
+    private void cycleAnimationScope() {
+        AppearanceAnimationScope[] values = AppearanceAnimationScope.values();
+        AppearanceAnimationScope current = config.snapshot().appearanceAnimationScope();
+        config.setAppearanceAnimationScope(values[(current.ordinal() + 1) % values.length]);
     }
 
     private void toggleFillMode() {
@@ -742,28 +764,33 @@ public final class DamageNumbersConfigScreen extends DamageNumbersScreenBase {
         drawInputLabel(graphics, left, customizationY(145),
                 Component.translatable("damage_numbers.customization.scale_with_damage"));
         drawInputLabel(graphics, left, customizationY(167), Component.translatable("damage_numbers.customization.scale"));
-        drawSetting(graphics, left, customizationY(189), Component.translatable("damage_numbers.customization.animation"),
-                animationName(style.splashAnimation()).getString());
-        drawSetting(graphics, left, customizationY(211), Component.translatable("damage_numbers.customization.fill_mode"),
+        drawSetting(graphics, left, customizationY(189),
+                Component.translatable("damage_numbers.customization.animation_scope"),
+                animationScopeName(style.appearanceAnimationScope()).getString());
+        drawSetting(graphics, left, customizationY(211), Component.translatable("damage_numbers.customization.animation"),
+                animationName(style.appearanceAnimation()).getString());
+        drawInputLabel(graphics, left, customizationY(233),
+                Component.translatable("damage_numbers.customization.animation_duration"));
+        drawSetting(graphics, left, customizationY(255), Component.translatable("damage_numbers.customization.fill_mode"),
                 Component.translatable("damage_numbers.color_mode." + style.fill().mode().name().toLowerCase(Locale.ROOT)).getString());
-        drawInputLabel(graphics, left, customizationY(233), Component.translatable("damage_numbers.customization.color_first"));
-        drawInputLabel(graphics, left, customizationY(255), Component.translatable("damage_numbers.customization.color_second"));
-        drawInputLabel(graphics, left, customizationY(277), Component.translatable("damage_numbers.customization.underlay"));
-        drawInputLabel(graphics, left, customizationY(299), Component.translatable("damage_numbers.customization.border_width"));
-        int angleY = customizationY(321);
+        drawInputLabel(graphics, left, customizationY(277), Component.translatable("damage_numbers.customization.color_first"));
+        drawInputLabel(graphics, left, customizationY(299), Component.translatable("damage_numbers.customization.color_second"));
+        drawInputLabel(graphics, left, customizationY(321), Component.translatable("damage_numbers.customization.underlay"));
+        drawInputLabel(graphics, left, customizationY(343), Component.translatable("damage_numbers.customization.border_width"));
+        int angleY = customizationY(365);
         drawInputLabel(graphics, left, angleY, Component.translatable("damage_numbers.customization.gradient_angle"));
         drawAngleDial(graphics, left + formWidth - 148, angleY + 2, style.gradientAngleDegrees());
         graphics.text(font, Math.round(style.gradientAngleDegrees()) + "\u00B0", left + formWidth - 29,
                 angleY + 5, MUTED, false);
         Component advancedLabel = Component.literal(advancedSettingsExpanded ? "▼ " : "▶ ")
                 .append(Component.translatable("damage_numbers.customization.advanced"));
-        graphics.text(font, advancedLabel, left, customizationY(343) + 5, MUTED, false);
+        graphics.text(font, advancedLabel, left, customizationY(387) + 5, MUTED, false);
         if (advancedSettingsExpanded) {
-            drawInputLabel(graphics, left, customizationY(365),
-                    Component.translatable("damage_numbers.customization.lifetime"));
-            drawInputLabel(graphics, left, customizationY(387),
-                    Component.translatable("damage_numbers.customization.minimum_radius"));
             drawInputLabel(graphics, left, customizationY(409),
+                    Component.translatable("damage_numbers.customization.lifetime"));
+            drawInputLabel(graphics, left, customizationY(431),
+                    Component.translatable("damage_numbers.customization.minimum_radius"));
+            drawInputLabel(graphics, left, customizationY(453),
                     Component.translatable("damage_numbers.customization.maximum_radius"));
         }
         renderColorControls(graphics, style, mouseX, mouseY);
@@ -910,6 +937,92 @@ public final class DamageNumbersConfigScreen extends DamageNumbersScreenBase {
         }
     }
 
+    private void drawAnimatedNumberPreview(GuiGraphicsExtractor graphics, Snapshot style, String value,
+                                           float centerX, float centerY, float scale, float ageSeconds,
+                                           float baseAlpha) {
+        Matrix3x2fStack pose = graphics.pose();
+        pose.pushMatrix();
+        pose.translate(centerX, centerY);
+        pose.scale(scale, scale);
+        Component number = FontStyleResolver.component(value, style.font(), style.customFontId());
+        int textWidth = Math.max(1, font.width(number));
+        int textX = -textWidth / 2;
+        int textY = -font.lineHeight / 2;
+        AppearanceAnimator.Transform[] transforms = AppearanceAnimator.glyphs(style.appearanceAnimation(),
+                style.appearanceAnimationScope(), value.codePointCount(0, value.length()), ageSeconds,
+                style.appearanceAnimationMillis());
+        int advance = 0;
+        int glyphIndex = 0;
+        for (int offset = 0; offset < value.length(); glyphIndex++) {
+            int codePoint = value.codePointAt(offset);
+            Component glyph = FontStyleResolver.component(new String(Character.toChars(codePoint)),
+                    style.font(), style.customFontId());
+            int glyphWidth = font.width(glyph);
+            int glyphX = textX + advance;
+            AppearanceAnimator.Transform transform = transforms[glyphIndex];
+            float alpha = baseAlpha * transform.alpha();
+            int fill = style.fill().colorAt(gradientProgress(
+                    (advance + glyphWidth * 0.5F) / textWidth, 0.5F, style.gradientAngleDegrees()));
+            if (transform.blurred()) {
+                int blur = withAlpha(fill, baseAlpha * transform.blurAlpha());
+                for (int direction = 0; direction < BLUR_DIRECTIONS; direction++) {
+                    double angle = Math.PI * 2.0D * direction / BLUR_DIRECTIONS;
+                    drawPreviewGlyph(graphics, pose, glyph, glyphX, glyphWidth, textY, transform,
+                            (float) Math.cos(angle) * transform.blurRadius(),
+                            (float) Math.sin(angle) * transform.blurRadius(), blur);
+                }
+            }
+            if (alpha > 0.015F) {
+                int underlay = withAlpha(style.border().colorAt(0.5F), alpha);
+                float borderWidth = style.borderWidth();
+                if (borderWidth > 0.0F) {
+                    int rings = Math.max(1, Math.min(8, (int) Math.ceil(borderWidth * 2.0F)));
+                    for (int ring = 1; ring <= rings; ring++) {
+                        float radius = borderWidth * ring / rings;
+                        int directions = Math.min(32, 8 + (ring - 1) * 4);
+                        for (int direction = 0; direction < directions; direction++) {
+                            double angle = Math.PI * 2.0D * direction / directions;
+                            drawPreviewGlyph(graphics, pose, glyph, glyphX, glyphWidth, textY, transform,
+                                    (float) Math.cos(angle) * radius, (float) Math.sin(angle) * radius,
+                                    underlay);
+                        }
+                    }
+                }
+                drawPreviewGlyph(graphics, pose, glyph, glyphX, glyphWidth, textY, transform,
+                        0.0F, 0.0F, underlay);
+                drawPreviewGlyph(graphics, pose, glyph, glyphX, glyphWidth, textY, transform,
+                        0.0F, 0.0F, withAlpha(fill, alpha));
+            }
+            advance += glyphWidth;
+            offset += Character.charCount(codePoint);
+        }
+        pose.popMatrix();
+    }
+
+    /**
+     * Draws one glyph under its animation transform. The ring or blur offset is applied outside the
+     * transform so every copy stays a rigid offset of the animated glyph.
+     */
+    private void drawPreviewGlyph(GuiGraphicsExtractor graphics, Matrix3x2fStack pose, Component glyph,
+                                  int glyphX, int glyphWidth, int textY,
+                                  AppearanceAnimator.Transform transform, float offsetX, float offsetY,
+                                  int color) {
+        pose.pushMatrix();
+        pose.translate(offsetX, offsetY);
+        if (!transform.identity()) {
+            float anchorX = transform.anchorWholeNumber() ? 0.0F : glyphX + glyphWidth * 0.5F;
+            float anchorY = textY + font.lineHeight * 0.5F;
+            pose.translate(anchorX, anchorY + transform.offsetY());
+            if (transform.rotationDegrees() != 0.0F) {
+                pose.rotate((float) Math.toRadians(transform.rotationDegrees()));
+            }
+            pose.scale(transform.scaleX(), transform.scaleY());
+            pose.translate(-anchorX, -anchorY);
+        }
+        graphics.text(font, glyph, glyphX, textY, color, false);
+        pose.popMatrix();
+    }
+
     private void renderAnimatedPreview(GuiGraphicsExtractor graphics, Snapshot style, int previewTop, int viewportTop,
                                        int viewportBottom) {
         long now = System.nanoTime();
@@ -929,19 +1042,17 @@ public final class DamageNumbersConfigScreen extends DamageNumbersScreenBase {
         graphics.enableScissor(contentX() + 1, clipTop,
                 contentX() + customizationFormWidth() - 1, clipBottom);
         for (PreviewNumber number : previewNumbers) {
-            float progress = Math.min(1.0F, (float) (now - number.createdAtNanos()) / lifetime);
             float ageSeconds = (now - number.createdAtNanos()) / 1_000_000_000.0F;
             float remainingSeconds = (lifetime - (now - number.createdAtNanos())) / 1_000_000_000.0F;
-            PreviewTransform transform = previewAnimation(style.splashAnimation(), progress, ageSeconds);
-            float alpha = previewFadeAlpha(ageSeconds, remainingSeconds);
+            float alpha = AppearanceAnimator.fadeOutAlpha(remainingSeconds);
             if (alpha > 0.015F) {
                 float configuredScale = Math.min(50.0F, 1.45F * style.scale() / 0.04F);
                 if (style.scaleWithDamage()) {
                     configuredScale *= 1.0F + Math.min(0.75F,
                             (float) Math.log1p(number.damage()) * 0.18F);
                 }
-                drawNumberPreview(graphics, style, number.text(), number.x(),
-                        number.y() - transform.rise(), configuredScale * transform.scale(), alpha);
+                drawAnimatedNumberPreview(graphics, style, number.text(), number.x(), number.y(),
+                        configuredScale, ageSeconds, alpha);
             }
         }
         graphics.disableScissor();
@@ -969,40 +1080,8 @@ public final class DamageNumbersConfigScreen extends DamageNumbersScreenBase {
         }
     }
 
-    private static PreviewTransform previewAnimation(SplashAnimation animation, float progress, float ageSeconds) {
-        float intro = Math.min(1.0F, ageSeconds / 0.22F);
-        float smoothIntro = smootherStep(intro);
-        float smoothProgress = smootherStep(progress);
-        return switch (animation) {
-            case POP -> {
-                float pulse = (float) Math.sin(Math.PI * smoothIntro);
-                yield new PreviewTransform(0.72F + 0.28F * smoothIntro + 0.22F * pulse,
-                        6.0F * smoothProgress);
-            }
-            case BOUNCE -> {
-                float bounce = (float) Math.abs(Math.sin(smoothIntro * Math.PI * 1.5D))
-                        * (1.0F - smoothIntro);
-                yield new PreviewTransform(0.78F + 0.22F * smoothIntro + 0.16F * bounce,
-                        5.0F * smoothProgress);
-            }
-            case RISE -> new PreviewTransform(1.0F, 9.0F * smoothProgress);
-            case NONE -> new PreviewTransform(1.0F, 0.0F);
-        };
-    }
-
-    private static float previewFadeAlpha(float ageSeconds, float remainingSeconds) {
-        float fadeIn = smootherStep(ageSeconds / 0.14F);
-        float fadeOut = smootherStep(remainingSeconds / 0.38F);
-        return fadeIn * fadeOut;
-    }
-
     private static long millisToNanos(long millis) {
         return millis > Long.MAX_VALUE / 1_000_000L ? Long.MAX_VALUE : millis * 1_000_000L;
-    }
-
-    private static float smootherStep(float value) {
-        float x = Math.max(0.0F, Math.min(1.0F, value));
-        return x * x * x * (x * (x * 6.0F - 15.0F) + 10.0F);
     }
 
     private static int withAlpha(int argb, float alpha) {
@@ -1091,8 +1170,12 @@ public final class DamageNumbersConfigScreen extends DamageNumbersScreenBase {
         return Component.literal(suffix);
     }
 
-    private static Component animationName(SplashAnimation animation) {
+    private static Component animationName(AppearanceAnimation animation) {
         return Component.translatable("damage_numbers.animation." + animation.name().toLowerCase(Locale.ROOT));
+    }
+
+    private static Component animationScopeName(AppearanceAnimationScope scope) {
+        return Component.translatable("damage_numbers.animation_scope." + scope.name().toLowerCase(Locale.ROOT));
     }
 
     private static String rangeLabel(float minimum, float nextMinimum) {
@@ -1190,9 +1273,6 @@ public final class DamageNumbersConfigScreen extends DamageNumbersScreenBase {
     }
 
     private record PreviewNumber(String text, float damage, float x, float y, long createdAtNanos) {
-    }
-
-    private record PreviewTransform(float scale, float rise) {
     }
 
     private record RangeSegment(int index, int x, int y, int width, int height) {

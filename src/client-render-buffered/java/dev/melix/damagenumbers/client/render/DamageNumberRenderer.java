@@ -3,7 +3,7 @@ package dev.melix.damagenumbers.client.render;
 import com.mojang.blaze3d.vertex.PoseStack;
 import dev.melix.damagenumbers.client.config.DamageNumbersConfig.ColorPaint;
 import dev.melix.damagenumbers.client.config.DamageNumbersConfig.Snapshot;
-import dev.melix.damagenumbers.client.config.DamageNumbersConfig.SplashAnimation;
+import dev.melix.damagenumbers.client.render.AppearanceAnimator.Transform;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
@@ -11,6 +11,7 @@ import net.minecraft.client.gui.Font;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.phys.Vec3;
+import org.joml.Quaternionf;
 
 import java.lang.reflect.Method;
 import java.util.List;
@@ -18,6 +19,7 @@ import java.util.List;
 final class DamageNumberRenderer {
     private static final int FULL_BRIGHT = 0x00F000F0;
     private static final double FACE_DEPTH_OFFSET = 0.001D;
+    private static final int BLUR_DIRECTIONS = 8;
     private static final Method CAMERA_POSITION = findCameraPositionMethod();
     private static final boolean LEGACY_X_FLIP = FabricLoader.getInstance()
             .getModContainer("minecraft")
@@ -48,13 +50,11 @@ final class DamageNumberRenderer {
 
     private void renderPass(DamageNumber number, long nowNanos, PoseStack matrices, Camera camera,
                             MultiBufferSource consumers, boolean face) {
-        float progress = number.progress(nowNanos);
         float ageSeconds = number.ageSeconds(nowNanos);
-        float alpha = fadeAlpha(ageSeconds, number.remainingSeconds(nowNanos));
+        float alpha = AppearanceAnimator.fadeOutAlpha(number.remainingSeconds(nowNanos));
         Snapshot style = number.style();
-        AnimationTransform animation = animation(style.splashAnimation(), progress, ageSeconds);
         Vec3 cameraPosition = cameraPosition(camera);
-        Vec3 position = number.position().add(0.0D, animation.rise(), 0.0D);
+        Vec3 position = number.position();
         Vec3 towardCamera = cameraPosition.subtract(position);
         double cameraDistance = towardCamera.length();
         alpha *= proximityAlpha(cameraDistance);
@@ -73,7 +73,7 @@ final class DamageNumberRenderer {
                 position.z - cameraPosition.z
         );
         matrices.mulPose(camera.rotation());
-        float worldScale = style.scale() * number.scaleMultiplier() * animation.scale();
+        float worldScale = style.scale() * number.scaleMultiplier();
         matrices.scale(LEGACY_X_FLIP ? -worldScale : worldScale, -worldScale, worldScale);
 
         Font font = Minecraft.getInstance().font;
@@ -82,30 +82,24 @@ final class DamageNumberRenderer {
         for (Glyph glyph : glyphs) {
             totalWidth += glyph.width();
         }
+        // Resolved once per number: the outline draws every glyph up to 256 times.
+        Transform[] transforms = AppearanceAnimator.glyphs(style.appearanceAnimation(),
+                style.appearanceAnimationScope(), glyphs.length, ageSeconds,
+                style.appearanceAnimationMillis());
 
         float startX = -totalWidth / 2.0F;
         float y = -font.lineHeight / 2.0F;
         if (face) {
-            MultiBufferSource gradientConsumers = GradientMultiBufferSource.wrap(
-                    consumers,
-                    style.fill(),
-                    style.gradientAngleDegrees(),
-                    startX,
-                    y,
-                    startX + totalWidth,
-                    y + font.lineHeight,
-                    alpha
-            );
-            renderFill(glyphs, startX, y, totalWidth, ColorPaint.solid(0xFFFFFFFF), 1.0F,
-                    font, matrices, gradientConsumers);
+            renderFaceGlyphs(glyphs, transforms, startX, y, totalWidth, style, alpha,
+                    font, matrices, consumers);
         } else {
             ColorPaint underlay = ColorPaint.solid(style.border().colorAt(0.5F));
-            float underlayAlpha = progress <= 0.62F ? alpha : alpha * alpha;
             if (style.borderWidth() > 0.0F) {
-                renderBorder(glyphs, startX, y, totalWidth, underlay, style.borderWidth(), underlayAlpha,
-                        font, matrices, consumers);
+                renderBorder(glyphs, transforms, startX, y, totalWidth, underlay, style.borderWidth(),
+                        alpha, font, matrices, consumers);
             }
-            renderFill(glyphs, startX, y, totalWidth, underlay, underlayAlpha, font, matrices, consumers);
+            renderGlyphRun(glyphs, transforms, startX, y, totalWidth, underlay, alpha,
+                    font, matrices, consumers);
         }
         matrices.popPose();
     }
@@ -126,6 +120,7 @@ final class DamageNumberRenderer {
 
     private static void renderBorder(
             Glyph[] glyphs,
+            Transform[] transforms,
             float startX,
             float y,
             float totalWidth,
@@ -142,53 +137,129 @@ final class DamageNumberRenderer {
             float radius = width * ring / rings;
             for (int direction = 0; direction < directions; direction++) {
                 double angle = Math.PI * 2.0D * direction / directions;
-                float dx = (float) Math.cos(angle) * radius;
-                float dy = (float) Math.sin(angle) * radius;
-                renderGlyphRun(glyphs, startX + dx, y + dy, totalWidth, paint, alpha,
+                // Offsetting the whole run keeps the ring a rigid copy of the animated glyphs.
+                matrices.pushPose();
+                matrices.translate((float) Math.cos(angle) * radius, (float) Math.sin(angle) * radius,
+                        0.0F);
+                renderGlyphRun(glyphs, transforms, startX, y, totalWidth, paint, alpha,
                         font, matrices, consumers);
+                matrices.popPose();
             }
         }
     }
 
-    private static void renderFill(
+    private static void renderFaceGlyphs(
             Glyph[] glyphs,
+            Transform[] transforms,
             float startX,
             float y,
             float totalWidth,
-            ColorPaint paint,
-            float alpha,
+            Snapshot style,
+            float baseAlpha,
             Font font,
             PoseStack matrices,
             MultiBufferSource consumers
     ) {
-        renderGlyphRun(glyphs, startX, y, totalWidth, paint, alpha, font, matrices, consumers);
+        float x = startX;
+        MultiBufferSource fillConsumers = null;
+        float fillAlpha = -1.0F;
+        for (int index = 0; index < glyphs.length; index++) {
+            Glyph glyph = glyphs[index];
+            Transform transform = transforms[index];
+            if (transform.blurred()) {
+                renderBlurGhosts(glyph, transform, x, y, startX, totalWidth, style,
+                        baseAlpha * transform.blurAlpha(), font, matrices, consumers);
+            }
+            float glyphAlpha = baseAlpha * transform.alpha();
+            if (glyphAlpha > 0.001F) {
+                if (glyphAlpha != fillAlpha) {
+                    fillConsumers = gradient(consumers, style, startX, y, totalWidth, font, glyphAlpha);
+                    fillAlpha = glyphAlpha;
+                }
+                renderGlyph(glyph, x, y, 0xFFFFFFFF, transform, font, matrices, fillConsumers);
+            }
+            x += glyph.width();
+        }
+    }
+
+    /** Fakes a blur by ringing the glyph with faint offset copies that tighten as it resolves. */
+    private static void renderBlurGhosts(Glyph glyph, Transform transform, float x, float y, float startX,
+                                         float totalWidth, Snapshot style, float alpha, Font font,
+                                         PoseStack matrices, MultiBufferSource consumers) {
+        if (alpha <= 0.001F) {
+            return;
+        }
+        MultiBufferSource ghostConsumers = gradient(consumers, style, startX, y, totalWidth, font, alpha);
+        for (int direction = 0; direction < BLUR_DIRECTIONS; direction++) {
+            double angle = Math.PI * 2.0D * direction / BLUR_DIRECTIONS;
+            matrices.pushPose();
+            matrices.translate((float) Math.cos(angle) * transform.blurRadius(),
+                    (float) Math.sin(angle) * transform.blurRadius(), 0.0F);
+            renderGlyph(glyph, x, y, 0xFFFFFFFF, transform, font, matrices, ghostConsumers);
+            matrices.popPose();
+        }
+    }
+
+    private static MultiBufferSource gradient(MultiBufferSource consumers, Snapshot style, float startX,
+                                              float top, float totalWidth, Font font, float alpha) {
+        return GradientMultiBufferSource.wrap(consumers, style.fill(), style.gradientAngleDegrees(),
+                startX, top, startX + totalWidth, top + font.lineHeight, alpha);
     }
 
     private static void renderGlyphRun(
             Glyph[] glyphs,
+            Transform[] transforms,
             float startX,
             float y,
             float totalWidth,
             ColorPaint paint,
-            float alpha,
+            float baseAlpha,
             Font font,
             PoseStack matrices,
             MultiBufferSource consumers
     ) {
         float x = startX;
         float covered = 0.0F;
-        for (Glyph glyph : glyphs) {
+        for (int index = 0; index < glyphs.length; index++) {
+            Glyph glyph = glyphs[index];
+            Transform transform = transforms[index];
             float center = covered + glyph.width() * 0.5F;
             float gradientProgress = totalWidth <= 0.0F ? 0.0F : center / totalWidth;
-            int color = multiplyAlpha(paint.colorAt(gradientProgress), alpha);
-            // Alpha 0-3 means opaque RGB.
-            if ((color >>> 24) >= 4) {
-                font.drawInBatch(glyph.component(), x, y, color, false, matrices.last().pose(), consumers,
-                        Font.DisplayMode.NORMAL, 0, FULL_BRIGHT);
-            }
+            int color = multiplyAlpha(paint.colorAt(gradientProgress), baseAlpha * transform.alpha());
+            renderGlyph(glyph, x, y, color, transform, font, matrices, consumers);
             x += glyph.width();
             covered += glyph.width();
         }
+    }
+
+    private static void renderGlyph(Glyph glyph, float x, float y, int color, Transform transform,
+                                    Font font, PoseStack matrices, MultiBufferSource consumers) {
+        // Alpha 0-3 means opaque RGB in the font renderer, so skip those colors entirely.
+        if ((color >>> 24) < 4) {
+            return;
+        }
+        if (transform.identity()) {
+            drawGlyph(glyph, x, y, color, font, matrices, consumers);
+            return;
+        }
+        float anchorX = transform.anchorWholeNumber() ? 0.0F : x + glyph.width() * 0.5F;
+        float anchorY = y + font.lineHeight * 0.5F;
+        matrices.pushPose();
+        matrices.translate(anchorX, anchorY + transform.offsetY(), 0.0F);
+        if (transform.rotationDegrees() != 0.0F) {
+            matrices.mulPose(new Quaternionf()
+                    .rotationZ((float) Math.toRadians(transform.rotationDegrees())));
+        }
+        matrices.scale(transform.scaleX(), transform.scaleY(), 1.0F);
+        matrices.translate(-anchorX, -anchorY, 0.0F);
+        drawGlyph(glyph, x, y, color, font, matrices, consumers);
+        matrices.popPose();
+    }
+
+    private static void drawGlyph(Glyph glyph, float x, float y, int color, Font font, PoseStack matrices,
+                                  MultiBufferSource consumers) {
+        font.drawInBatch(glyph.component(), x, y, color, false, matrices.last().pose(), consumers,
+                Font.DisplayMode.NORMAL, 0, FULL_BRIGHT);
     }
 
     private static int multiplyAlpha(int argb, float alpha) {
@@ -197,39 +268,8 @@ final class DamageNumberRenderer {
         return resultAlpha << 24 | argb & 0x00FFFFFF;
     }
 
-    private static float fadeAlpha(float ageSeconds, float remainingSeconds) {
-        float fadeIn = smootherStep(ageSeconds / 0.14F);
-        float fadeOut = smootherStep(remainingSeconds / 0.38F);
-        return fadeIn * fadeOut;
-    }
-
-    private static AnimationTransform animation(SplashAnimation animation, float progress, float ageSeconds) {
-        float intro = Math.min(1.0F, ageSeconds / 0.22F);
-        float smoothIntro = smootherStep(intro);
-        float smoothProgress = smootherStep(progress);
-        return switch (animation) {
-            case POP -> {
-                float pulse = (float) Math.sin(Math.PI * smoothIntro);
-                yield new AnimationTransform(0.72F + 0.28F * smoothIntro + 0.22F * pulse,
-                        0.30F * smoothProgress);
-            }
-            case BOUNCE -> {
-                float bounce = (float) Math.abs(Math.sin(smoothIntro * Math.PI * 1.5D)) * (1.0F - smoothIntro);
-                yield new AnimationTransform(0.78F + 0.22F * smoothIntro + 0.16F * bounce,
-                        0.24F * smoothProgress);
-            }
-            case RISE -> new AnimationTransform(1.0F, 0.42F * smoothProgress);
-            case NONE -> new AnimationTransform(1.0F, 0.0F);
-        };
-    }
-
     private static float proximityAlpha(double cameraDistance) {
-        return smootherStep((float) ((cameraDistance - 0.12D) / 0.28D));
-    }
-
-    private static float smootherStep(float value) {
-        float x = Math.max(0.0F, Math.min(1.0F, value));
-        return x * x * x * (x * (x * 6.0F - 15.0F) + 10.0F);
+        return AppearanceAnimator.smootherStep((float) ((cameraDistance - 0.12D) / 0.28D));
     }
 
     private static Method findCameraPositionMethod() {
@@ -251,8 +291,5 @@ final class DamageNumberRenderer {
     }
 
     private record Glyph(Component component, int width) {
-    }
-
-    private record AnimationTransform(float scale, float rise) {
     }
 }

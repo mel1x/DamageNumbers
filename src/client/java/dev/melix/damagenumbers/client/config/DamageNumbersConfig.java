@@ -27,14 +27,20 @@ public final class DamageNumbersConfig {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static final Path CONFIG_PATH = FabricLoader.getInstance().getConfigDir().resolve("damage-numbers.json");
     private static final DamageNumbersConfig INSTANCE = new DamageNumbersConfig();
+    public static final long DEFAULT_APPEARANCE_ANIMATION_MILLIS = 220L;
+    private static final float DEFAULT_SCALE = 0.032F;
+    /** Keeps a mistyped value from parking numbers mid-entrance for their whole lifetime. */
+    public static final long MAXIMUM_APPEARANCE_ANIMATION_MILLIS = 10_000L;
 
     private boolean enabled = true;
     private boolean showAllDamageSources;
     private float minimumDamage = 0.0F;
-    private float scale = 0.04F;
+    private float scale = DEFAULT_SCALE;
     private boolean scaleWithDamage;
     private long fadeOutTimeMillis = 1_250L;
-    private SplashAnimation splashAnimation = SplashAnimation.POP;
+    private AppearanceAnimationScope appearanceAnimationScope = AppearanceAnimationScope.WHOLE_DAMAGE;
+    private AppearanceAnimation appearanceAnimation = AppearanceAnimation.SCALE_IN;
+    private long appearanceAnimationMillis = DEFAULT_APPEARANCE_ANIMATION_MILLIS;
     private FontChoice font = FontChoice.MINECRAFT;
     private String customFontId;
     private ColorPaint fill = ColorPaint.gradient(0xFFFFC857, 0xFFE84936);
@@ -132,7 +138,8 @@ public final class DamageNumbersConfig {
     }
 
     public synchronized Snapshot snapshot() {
-        return new Snapshot(scale, scaleWithDamage, fadeOutTimeMillis, splashAnimation, font, customFontId,
+        return new Snapshot(scale, scaleWithDamage, fadeOutTimeMillis, appearanceAnimationScope,
+                appearanceAnimation, appearanceAnimationMillis, font, customFontId,
                 fill, border,
                 borderWidth, gradientAngleDegrees, minimumSpawnRadius, maximumSpawnRadius);
     }
@@ -256,8 +263,25 @@ public final class DamageNumbersConfig {
         selectedPresetId = null;
     }
 
-    public synchronized void setSplashAnimation(SplashAnimation splashAnimation) {
-        this.splashAnimation = Objects.requireNonNull(splashAnimation, "splashAnimation");
+    public synchronized void setAppearanceAnimationScope(AppearanceAnimationScope appearanceAnimationScope) {
+        this.appearanceAnimationScope = Objects.requireNonNull(appearanceAnimationScope,
+                "appearanceAnimationScope");
+        updateActiveDamageRange();
+        selectedPresetId = null;
+    }
+
+    public synchronized void setAppearanceAnimation(AppearanceAnimation appearanceAnimation) {
+        this.appearanceAnimation = Objects.requireNonNull(appearanceAnimation, "appearanceAnimation");
+        updateActiveDamageRange();
+        selectedPresetId = null;
+    }
+
+    public synchronized void setAppearanceAnimationMillis(long appearanceAnimationMillis) {
+        if (appearanceAnimationMillis < 0L) {
+            throw new IllegalArgumentException("appearanceAnimationMillis must be non-negative");
+        }
+        this.appearanceAnimationMillis = Math.min(MAXIMUM_APPEARANCE_ANIMATION_MILLIS,
+                appearanceAnimationMillis);
         updateActiveDamageRange();
         selectedPresetId = null;
     }
@@ -419,10 +443,13 @@ public final class DamageNumbersConfig {
     }
 
     private void applyStyle(Snapshot style, boolean markCustom) {
-        scale = Float.isFinite(style.scale()) && style.scale() > 0.001F ? style.scale() : 0.04F;
+        scale = Float.isFinite(style.scale()) && style.scale() > 0.001F ? style.scale() : DEFAULT_SCALE;
         scaleWithDamage = style.scaleWithDamage();
         fadeOutTimeMillis = Math.max(0L, style.fadeOutTimeMillis());
-        splashAnimation = Objects.requireNonNull(style.splashAnimation(), "splashAnimation");
+        appearanceAnimationScope = Objects.requireNonNull(style.appearanceAnimationScope(),
+                "appearanceAnimationScope");
+        appearanceAnimation = Objects.requireNonNull(style.appearanceAnimation(), "appearanceAnimation");
+        appearanceAnimationMillis = clampAppearanceAnimationMillis(style.appearanceAnimationMillis());
         font = Objects.requireNonNull(style.font(), "font");
         customFontId = font == FontChoice.CUSTOM ? style.customFontId() : null;
         fill = Objects.requireNonNull(style.fill(), "fill");
@@ -482,7 +509,9 @@ public final class DamageNumbersConfig {
         object.addProperty("scale", style.scale());
         object.addProperty("scaleWithDamage", style.scaleWithDamage());
         object.addProperty("fadeOutTimeMillis", style.fadeOutTimeMillis());
-        object.addProperty("splashAnimation", style.splashAnimation().name());
+        object.addProperty("appearanceAnimationScope", style.appearanceAnimationScope().name());
+        object.addProperty("appearanceAnimation", style.appearanceAnimation().name());
+        object.addProperty("appearanceAnimationMillis", style.appearanceAnimationMillis());
         object.addProperty("font", style.font().name());
         if (style.customFontId() != null) {
             object.addProperty("customFontId", style.customFontId());
@@ -501,7 +530,11 @@ public final class DamageNumbersConfig {
                 positiveScale(object, "scale", fallback.scale()),
                 booleanValue(object, "scaleWithDamage", fallback.scaleWithDamage()),
                 nonNegativeLong(object, "fadeOutTimeMillis", fallback.fadeOutTimeMillis()),
-                enumValue(object, "splashAnimation", SplashAnimation.class, fallback.splashAnimation()),
+                enumValue(object, "appearanceAnimationScope", AppearanceAnimationScope.class,
+                        fallback.appearanceAnimationScope()),
+                appearanceAnimationValue(object, fallback.appearanceAnimation()),
+                clampAppearanceAnimationMillis(nonNegativeLong(object, "appearanceAnimationMillis",
+                        fallback.appearanceAnimationMillis())),
                 fontValue(object, fallback.font()),
                 nullableStringValue(object, "customFontId", fallback.customFontId()),
                 readPaint(object.get("fill"), fallback.fill()),
@@ -521,9 +554,28 @@ public final class DamageNumbersConfig {
 
     private static Snapshot withDefaultFont(Snapshot style) {
         return new Snapshot(style.scale(), style.scaleWithDamage(), style.fadeOutTimeMillis(),
-                style.splashAnimation(), FontChoice.MINECRAFT, null, style.fill(),
+                style.appearanceAnimationScope(), style.appearanceAnimation(),
+                style.appearanceAnimationMillis(), FontChoice.MINECRAFT, null,
+                style.fill(),
                 style.border(), style.borderWidth(), style.gradientAngleDegrees(), style.minimumSpawnRadius(),
                 style.maximumSpawnRadius());
+    }
+
+    private static long clampAppearanceAnimationMillis(long millis) {
+        return Math.max(0L, Math.min(MAXIMUM_APPEARANCE_ANIMATION_MILLIS, millis));
+    }
+
+    private static AppearanceAnimation appearanceAnimationValue(JsonObject object,
+                                                                  AppearanceAnimation fallback) {
+        if (object.has("appearanceAnimation")) {
+            return enumValue(object, "appearanceAnimation", AppearanceAnimation.class, fallback);
+        }
+        return switch (stringValue(object, "splashAnimation", "")) {
+            case "POP", "BOUNCE" -> AppearanceAnimation.POP_IN;
+            case "RISE" -> AppearanceAnimation.SLIDE_UP;
+            case "NONE" -> AppearanceAnimation.FADE_IN;
+            default -> fallback;
+        };
     }
 
     private static JsonObject writePaint(ColorPaint paint) {
@@ -677,11 +729,22 @@ public final class DamageNumbersConfig {
         }
     }
 
-    public enum SplashAnimation {
-        POP,
-        BOUNCE,
-        RISE,
-        NONE
+    public enum AppearanceAnimationScope {
+        PER_DIGIT,
+        WHOLE_DAMAGE
+    }
+
+    public enum AppearanceAnimation {
+        FADE_IN,
+        SCALE_IN,
+        POP_IN,
+        BLUR_IN,
+        SLIDE_UP,
+        DROP_IN,
+        SLAM,
+        SPIN_IN,
+        FLIP_IN,
+        WAVE
     }
 
     public enum ColorMode {
@@ -726,7 +789,9 @@ public final class DamageNumbersConfig {
             float scale,
             boolean scaleWithDamage,
             long fadeOutTimeMillis,
-            SplashAnimation splashAnimation,
+            AppearanceAnimationScope appearanceAnimationScope,
+            AppearanceAnimation appearanceAnimation,
+            long appearanceAnimationMillis,
             FontChoice font,
             String customFontId,
             ColorPaint fill,
