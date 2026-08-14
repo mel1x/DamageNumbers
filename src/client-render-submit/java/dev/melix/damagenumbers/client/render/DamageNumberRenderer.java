@@ -16,6 +16,7 @@ import java.util.List;
 
 final class DamageNumberRenderer {
     private static final int FULL_BRIGHT = 0x00F000F0;
+    private static final double FACE_DEPTH_OFFSET = 0.001D;
 
     void render(List<DamageNumber> numbers, long nowNanos, PoseStack matrices, Camera camera, Object context) {
         SubmitNodeCollector collector = (SubmitNodeCollector) context;
@@ -43,7 +44,8 @@ final class DamageNumberRenderer {
             return;
         }
         if (cameraDistance > 1.0E-5D) {
-            position = position.add(towardCamera.scale(0.012D / cameraDistance));
+            double cameraOffset = 0.012D + (face ? FACE_DEPTH_OFFSET : 0.0D);
+            position = position.add(towardCamera.scale(cameraOffset / cameraDistance));
         }
 
         matrices.pushPose();

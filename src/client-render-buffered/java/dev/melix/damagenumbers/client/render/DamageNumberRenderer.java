@@ -17,6 +17,7 @@ import java.util.List;
 
 final class DamageNumberRenderer {
     private static final int FULL_BRIGHT = 0x00F000F0;
+    private static final double FACE_DEPTH_OFFSET = 0.001D;
     private static final Method CAMERA_POSITION = findCameraPositionMethod();
     private static final boolean LEGACY_X_FLIP = FabricLoader.getInstance()
             .getModContainer("minecraft")
@@ -61,7 +62,8 @@ final class DamageNumberRenderer {
             return;
         }
         if (cameraDistance > 1.0E-5D) {
-            position = position.add(towardCamera.scale(0.012D / cameraDistance));
+            double cameraOffset = 0.012D + (face ? FACE_DEPTH_OFFSET : 0.0D);
+            position = position.add(towardCamera.scale(cameraOffset / cameraDistance));
         }
 
         matrices.pushPose();
