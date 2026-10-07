@@ -1,0 +1,7 @@
+plugins { id "net.fabricmc.fabric-loom" }
+ext.minecraftVersion = "26.3"
+ext.minecraftDependency = "26.3"
+ext.fabricApiVersion = "0.161.0+26.3"
+ext.javaRelease = 25
+ext.usesOfficialNames = true
+apply from: rootProject.file("gradle/fabric-version.gradle")
