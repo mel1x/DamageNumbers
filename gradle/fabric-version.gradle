@@ -31,7 +31,7 @@ sourceSets {
         String worldRenderSource
         if (minecraftVersion == "1.21.9") {
             worldRenderSource = "src/client-world-gap/java"
-        } else if (minecraftVersion == "26.2") {
+        } else if (["26.2", "26.3"].contains(minecraftVersion)) {
             worldRenderSource = "src/client-world-submit/java"
         } else if (["26.1", "26.1.1", "26.1.2"].contains(minecraftVersion)) {
             worldRenderSource = "src/client-world-26/java"
@@ -42,18 +42,19 @@ sourceSets {
         }
         String guiSource
         String buttonSource = null
-        String fontRenderSource = ["1.21.11", "26.1", "26.1.1", "26.1.2", "26.2"].contains(minecraftVersion)
+        String fontRenderSource = ["1.21.11", "26.1", "26.1.1", "26.1.2", "26.2", "26.3"].contains(minecraftVersion)
                 ? "src/client-font-modern/java"
                 : "src/client-font-legacy/java"
+        String fileDialogSource = minecraftVersion == "26.3" ? "src/client-filedialog-sdl/java" : "src/client-filedialog-tinyfd/java"
         String scrollSource
         if (minecraftVersion == "1.20.1") {
             scrollSource = "src/client-gui-scroll-1_20/java"
-        } else if (["1.21.9", "1.21.10", "1.21.11", "26.1", "26.1.1", "26.1.2", "26.2"].contains(minecraftVersion)) {
+        } else if (["1.21.9", "1.21.10", "1.21.11", "26.1", "26.1.1", "26.1.2", "26.2", "26.3"].contains(minecraftVersion)) {
             scrollSource = "src/client-gui-scroll-new/java"
         } else {
             scrollSource = "src/client-gui-scroll-modern/java"
         }
-        if (["26.1", "26.1.1", "26.1.2", "26.2"].contains(minecraftVersion)) {
+        if (["26.1", "26.1.1", "26.1.2", "26.2", "26.3"].contains(minecraftVersion)) {
             guiSource = "src/client-gui-26/java"
         } else if (["1.21.6", "1.21.7", "1.21.8", "1.21.9", "1.21.10", "1.21.11"]
                 .contains(minecraftVersion)) {
@@ -66,7 +67,7 @@ sourceSets {
         }
         List clientJavaSources = [
                 rootProject.file("src/client/java"),
-                rootProject.file(minecraftVersion == "26.2"
+                rootProject.file(["26.2", "26.3"].contains(minecraftVersion)
                         ? "src/client-render-submit/java"
                         : "src/client-render-buffered/java"),
                 rootProject.file(minecraftVersion == "1.20.1"
@@ -74,14 +75,15 @@ sourceSets {
                         : "src/client-network-modern/java"),
                 rootProject.file(worldRenderSource),
                 rootProject.file(guiSource),
-                rootProject.file(fontRenderSource),
+                rootProject.file(minecraftVersion == "26.3" ? "src/client-font-26_3/java" : fontRenderSource),
+                rootProject.file(fileDialogSource),
                 rootProject.file(scrollSource)
         ]
         if (buttonSource != null) {
             clientJavaSources.add(rootProject.file(buttonSource))
         }
-        if (["26.1", "26.1.1", "26.1.2", "26.2"].contains(minecraftVersion)) {
-            clientJavaSources.add(rootProject.file(minecraftVersion == "26.2"
+        if (["26.1", "26.1.1", "26.1.2", "26.2", "26.3"].contains(minecraftVersion)) {
+            clientJavaSources.add(rootProject.file(["26.2", "26.3"].contains(minecraftVersion)
                     ? "src/client-gui-navigation-26_2/java"
                     : "src/client-gui-navigation-26_1/java"))
         }
@@ -125,7 +127,8 @@ dependencies {
             "26.1"    : "18.0.0",
             "26.1.1"  : "18.0.0",
             "26.1.2"  : "18.0.0",
-            "26.2"    : "20.0.1"
+            "26.2"    : "20.0.1",
+            "26.3"    : "21.0.0-beta.1"
     ]
     String modMenuCompileConfiguration = usesOfficialNames ? "compileOnly" : "modCompileOnly"
     add(modMenuCompileConfiguration, "com.terraformersmc:modmenu:${modMenuVersions[minecraftVersion]}")

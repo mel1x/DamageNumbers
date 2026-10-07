@@ -51,7 +51,7 @@ final class DamageNumberRenderer {
         matrices.pushPose();
         matrices.translate(position.x - cameraPosition.x, position.y - cameraPosition.y,
                 position.z - cameraPosition.z);
-        matrices.mulPose(camera.rotation());
+        matrices.mulPose(new org.joml.Matrix4f().rotation(camera.rotation()));
         float worldScale = style.scale() * number.scaleMultiplier();
         matrices.scale(worldScale, -worldScale, worldScale);
 
@@ -199,8 +199,8 @@ final class DamageNumberRenderer {
         matrices.pushPose();
         matrices.translate(anchorX, anchorY + transform.offsetY(), 0.0F);
         if (transform.rotationDegrees() != 0.0F) {
-            matrices.mulPose(new Quaternionf()
-                    .rotationZ((float) Math.toRadians(transform.rotationDegrees())));
+            matrices.mulPose(new org.joml.Matrix4f().rotation(new Quaternionf()
+                    .rotationZ((float) Math.toRadians(transform.rotationDegrees()))));
         }
         matrices.scale(transform.scaleX(), transform.scaleY(), 1.0F);
         matrices.translate(-anchorX, -anchorY, 0.0F);

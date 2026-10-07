@@ -10,9 +10,6 @@ import net.fabricmc.loader.api.FabricLoader;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.minecraft.client.Minecraft;
 import net.minecraft.server.packs.repository.PackRepository;
-import org.lwjgl.PointerBuffer;
-import org.lwjgl.system.MemoryStack;
-import org.lwjgl.util.tinyfd.TinyFileDialogs;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -81,19 +78,7 @@ public final class CustomFontManager {
     }
 
     public static void openImportDialog(Minecraft minecraft, Consumer<CustomFont> onImported) {
-        Thread picker = new Thread(() -> {
-            String selected;
-            try (MemoryStack stack = MemoryStack.stackPush()) {
-                PointerBuffer filters = stack.mallocPointer(2);
-                filters.put(stack.UTF8("*.ttf"));
-                filters.put(stack.UTF8("*.otf"));
-                filters.flip();
-                selected = TinyFileDialogs.tinyfd_openFileDialog(
-                        "Add custom font", "", filters, "TTF / OTF fonts", false);
-            }
-            if (selected == null) {
-                return;
-            }
+        FontFilePicker.pick(selected -> {
             try {
                 CustomFont imported = importFont(Path.of(selected));
                 minecraft.execute(() -> enablePack(minecraft, true,
@@ -101,9 +86,7 @@ public final class CustomFontManager {
             } catch (Exception exception) {
                 LOGGER.warn("Could not import custom font {}", selected, exception);
             }
-        }, "DamageNumbers font picker");
-        picker.setDaemon(true);
-        picker.start();
+        });
     }
 
     public static synchronized void deleteFont(Minecraft minecraft, String fontId, Runnable onDeleted) {
